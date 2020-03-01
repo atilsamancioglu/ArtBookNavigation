@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/art_navigation"
+    app:startDestination="@id/artList">
+
+    <fragment
+        android:id="@+id/artList"
+        android:name="com.atilsamancioglu.artbooknavigation.ArtList"
+        android:label="fragment_art_list"
+        tools:layout="@layout/fragment_art_list" >
+        <action
+            android:id="@+id/action_artList_to_detailFragment"
+            app:destination="@id/detailFragment" />
+
+    </fragment>
+    <fragment
+        android:id="@+id/detailFragment"
+        android:name="com.atilsamancioglu.artbooknavigation.DetailFragment"
+        android:label="fragment_detail"
+        tools:layout="@layout/fragment_detail" >
+        <action
+            android:id="@+id/action_detailFragment_to_artList"
+            app:destination="@id/artList" />
+        <argument
+            android:name="id"
+            app:argType="integer"
+            android:defaultValue="0" />
+        <argument
+            android:name="info"
+            app:argType="string" />
+    </fragment>
+</navigation>
