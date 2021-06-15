@@ -17,21 +17,33 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.Navigation
-import kotlinx.android.synthetic.main.fragment_detail.*
+import com.atilsamancioglu.artbooknavigation.databinding.FragmentArtListBinding
+import com.atilsamancioglu.artbooknavigation.databinding.FragmentDetailBinding
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 
 
 class DetailFragment : Fragment() {
 
     var selectedPicture : Uri? = null
     var selectedBitmap : Bitmap? = null
+    private var _binding: FragmentDetailBinding? = null
+    // This property is only valid between onCreateView and onDestroyView.
+    private val binding get() = _binding!!
+    private lateinit var activityResultLauncher: ActivityResultLauncher<Intent>
+    private lateinit var permissionLauncher: ActivityResultLauncher<String>
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerLauncher()
 
 
     }
@@ -41,35 +53,34 @@ class DetailFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_detail, container, false)
-    }
+        _binding = FragmentDetailBinding.inflate(layoutInflater,container,false)
+        val view = binding.root
+        return view    }
 
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        button.setOnClickListener { save(view) }
-        imageView.setOnClickListener { selectImage(view) }
+        binding.button.setOnClickListener { save(view) }
+        binding.imageView.setOnClickListener { selectImage(view) }
 
         arguments?.let {
             val info = DetailFragmentArgs.fromBundle(it).info
             if (info.equals("new")) {
                 //NEW
-                artText.setText("")
-                artistText.setText("")
-                yearText.setText("")
-                button.visibility = View.VISIBLE
+                binding.artText.setText("")
+                binding.artistText.setText("")
+                binding.yearText.setText("")
+                binding.button.visibility = View.VISIBLE
 
                 val selectedImageBackground = BitmapFactory.decodeResource(context?.resources,R.drawable.selectimage)
-                imageView.setImageBitmap(selectedImageBackground)
-
+                binding.imageView.setImageBitmap(selectedImageBackground)
 
             } else {
                 //OLD
-
-                button.visibility = View.INVISIBLE
+                binding.button.visibility = View.INVISIBLE
 
                 val selectedId = DetailFragmentArgs.fromBundle(it).id
-                val database = context?.openOrCreateDatabase("Arts", Context.MODE_PRIVATE,null)
+                val database = requireActivity().openOrCreateDatabase("Arts", Context.MODE_PRIVATE,null)
 
                 val cursor = database!!.rawQuery("SELECT * FROM arts WHERE id = ?", arrayOf(selectedId.toString()))
 
@@ -79,19 +90,16 @@ class DetailFragment : Fragment() {
                 val imageIx = cursor.getColumnIndex("image")
 
                 while (cursor.moveToNext()) {
-                    artText.setText(cursor.getString(artNameIx))
-                    artistText.setText(cursor.getString(artistNameIx))
-                    yearText.setText(cursor.getString(yearIx))
+                    binding.artText.setText(cursor.getString(artNameIx))
+                    binding.artistText.setText(cursor.getString(artistNameIx))
+                    binding.yearText.setText(cursor.getString(yearIx))
 
                     val byteArray = cursor.getBlob(imageIx)
                     val bitmap = BitmapFactory.decodeByteArray(byteArray,0,byteArray.size)
-                    imageView.setImageBitmap(bitmap)
+                    binding.imageView.setImageBitmap(bitmap)
 
                 }
-
                 cursor.close()
-
-
             }
         }
 
@@ -99,9 +107,9 @@ class DetailFragment : Fragment() {
 
     fun save(view: View) {
 
-        val artName = artText.text.toString()
-        val artistName = artistText.text.toString()
-        val year = yearText.text.toString()
+        val artName = binding.artText.text.toString()
+        val artistName = binding.artistText.text.toString()
+        val year = binding.yearText.text.toString()
 
         if (selectedBitmap != null) {
             val smallBitmap = makeSmallerBitmap(selectedBitmap!!,300)
@@ -112,7 +120,7 @@ class DetailFragment : Fragment() {
 
             try {
 
-                val database = context?.openOrCreateDatabase("Arts", Context.MODE_PRIVATE, null)
+                val database = requireActivity().openOrCreateDatabase("Arts", Context.MODE_PRIVATE, null)
                 database?.execSQL("CREATE TABLE IF NOT EXISTS arts (id INTEGER PRIMARY KEY, artname VARCHAR, artistname VARCHAR, year VARCHAR, image BLOB)")
 
                 val sqlString =
@@ -159,66 +167,67 @@ class DetailFragment : Fragment() {
     fun selectImage(view: View) {
 
         activity?.let {
-            if(ContextCompat.checkSelfPermission(activity!!.applicationContext, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions( arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),1)
+            if(ContextCompat.checkSelfPermission(requireActivity().applicationContext, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+
             } else {
                 val intentToGallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-                startActivityForResult(intentToGallery,2)
+                activityResultLauncher.launch(intentToGallery)
+
             }
 
         }
 
-
-
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        if (requestCode == 1) {
-
-            if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                val intentToGallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-                startActivityForResult(intentToGallery,2)
-            }
-
-        }
-
-
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    }
-
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-
-        if ( requestCode == 2 && resultCode == Activity.RESULT_OK && data != null) {
-
-            selectedPicture = data.data
-
-            try {
-
-                if (selectedPicture != null) {
-
-                    if (Build.VERSION.SDK_INT >= 28) {
-                        val source =
-                            ImageDecoder.createSource(context!!.contentResolver, selectedPicture!!)
-                        selectedBitmap = ImageDecoder.decodeBitmap(source)
-                        imageView.setImageBitmap(selectedBitmap)
-                    } else {
-                        selectedBitmap =
-                            MediaStore.Images.Media.getBitmap(context!!.contentResolver, selectedPicture)
-                        imageView.setImageBitmap(selectedBitmap)
+    private fun registerLauncher() {
+        activityResultLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == AppCompatActivity.RESULT_OK) {
+                val intentFromResult = result.data
+                if (intentFromResult != null) {
+                    selectedPicture = intentFromResult.data
+                    try {
+                        if (Build.VERSION.SDK_INT >= 28) {
+                            val source = ImageDecoder.createSource(
+                                requireActivity().contentResolver,
+                                selectedPicture!!
+                            )
+                            selectedBitmap = ImageDecoder.decodeBitmap(source)
+                            binding.imageView.setImageBitmap(selectedBitmap)
+                        } else {
+                            selectedBitmap = MediaStore.Images.Media.getBitmap(
+                                requireActivity().contentResolver,
+                                selectedPicture
+                            )
+                            binding.imageView.setImageBitmap(selectedBitmap)
+                        }
+                    } catch (e: IOException) {
+                        e.printStackTrace()
                     }
                 }
-            } catch (e: Exception) {
-
             }
-
         }
+        permissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { result ->
+            if (result) {
+                //permission granted
+                val intentToGallery =
+                    Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                activityResultLauncher.launch(intentToGallery)
+            } else {
+                //permission denied
+                Toast.makeText(requireContext(), "Permisson needed!", Toast.LENGTH_LONG)
+                    .show()
+            }
+        }
+    }
 
 
-        super.onActivityResult(requestCode, resultCode, data)
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

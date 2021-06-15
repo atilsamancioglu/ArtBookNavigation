@@ -7,7 +7,7 @@ import android.view.*
 import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
-import kotlinx.android.synthetic.main.fragment_art_list.*
+import com.atilsamancioglu.artbooknavigation.databinding.FragmentArtListBinding
 
 
 class ArtList : Fragment() {
@@ -15,13 +15,13 @@ class ArtList : Fragment() {
     val artNameList = ArrayList<String>()
     val artIdList = ArrayList<Int>()
     private lateinit var artAdapter : ArtListAdapter
+    private var _binding: FragmentArtListBinding? = null
+    // This property is only valid between onCreateView and onDestroyView.
+    private val binding get() = _binding!!
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-
-
 
     }
 
@@ -30,7 +30,9 @@ class ArtList : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_art_list, container, false)
+        _binding = FragmentArtListBinding.inflate(layoutInflater,container,false)
+        val view = binding.root
+        return view
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -38,8 +40,8 @@ class ArtList : Fragment() {
 
 
         artAdapter = ArtListAdapter(artNameList,artIdList)
-        recyclerView.layoutManager = LinearLayoutManager(context)
-        recyclerView.adapter = artAdapter
+        binding.recyclerView.layoutManager = LinearLayoutManager(context)
+        binding.recyclerView.adapter = artAdapter
 
         getFromSQL()
 
@@ -49,7 +51,7 @@ class ArtList : Fragment() {
         try {
             if (activity != null) {
 
-                val database = activity!!.openOrCreateDatabase("Arts", Context.MODE_PRIVATE,null)
+                val database = requireActivity().openOrCreateDatabase("Arts", Context.MODE_PRIVATE,null)
 
                 val cursor = database.rawQuery("SELECT * FROM arts",null)
                 val artNameIx = cursor.getColumnIndex("artname")
@@ -76,5 +78,8 @@ class ArtList : Fragment() {
         }
     }
 
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }
