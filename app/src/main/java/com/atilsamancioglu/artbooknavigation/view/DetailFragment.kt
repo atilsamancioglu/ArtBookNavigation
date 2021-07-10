@@ -1,9 +1,7 @@
-package com.atilsamancioglu.artbooknavigation
+package com.atilsamancioglu.artbooknavigation.view
 
 
 import android.Manifest
-import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -13,7 +11,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,10 +20,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import androidx.navigation.Navigation
-import com.atilsamancioglu.artbooknavigation.databinding.FragmentArtListBinding
+import androidx.room.Room
+import com.atilsamancioglu.artbooknavigation.R
 import com.atilsamancioglu.artbooknavigation.databinding.FragmentDetailBinding
+import com.atilsamancioglu.artbooknavigation.model.Art
+import com.atilsamancioglu.artbooknavigation.roomdb.ArtDao
+import com.atilsamancioglu.artbooknavigation.roomdb.ArtDatabase
 import com.google.android.material.snackbar.Snackbar
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.disposables.CompositeDisposable
+import io.reactivex.rxjava3.schedulers.Schedulers
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 
@@ -40,12 +45,19 @@ class DetailFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var activityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<String>
+    private lateinit var artDatabase : ArtDatabase
+    private lateinit var artDao : ArtDao
+    private val mDisposable = CompositeDisposable()
+    var artFromMain : Art? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerLauncher()
 
+        artDatabase = Room.databaseBuilder(requireContext(), ArtDatabase::class.java, "Arts").build()
+
+        artDao = artDatabase.artDao()
 
     }
 
@@ -56,13 +68,15 @@ class DetailFragment : Fragment() {
         // Inflate the layout for this fragment
         _binding = FragmentDetailBinding.inflate(layoutInflater,container,false)
         val view = binding.root
-        return view    }
+        return view
+    }
 
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.button.setOnClickListener { save(view) }
+        binding.saveButton.setOnClickListener { save(view) }
         binding.imageView.setOnClickListener { selectImage(view) }
+        binding.deleteButton.setOnClickListener { delete(view) }
 
         arguments?.let {
             val info = DetailFragmentArgs.fromBundle(it).info
@@ -71,39 +85,48 @@ class DetailFragment : Fragment() {
                 binding.artText.setText("")
                 binding.artistText.setText("")
                 binding.yearText.setText("")
-                binding.button.visibility = View.VISIBLE
+                binding.saveButton.visibility = View.VISIBLE
+                binding.deleteButton.visibility = View.GONE
 
-                val selectedImageBackground = BitmapFactory.decodeResource(context?.resources,R.drawable.selectimage)
+                val selectedImageBackground = BitmapFactory.decodeResource(context?.resources,
+                    R.drawable.selectimage
+                )
                 binding.imageView.setImageBitmap(selectedImageBackground)
 
             } else {
                 //OLD
-                binding.button.visibility = View.INVISIBLE
+                binding.saveButton.visibility = View.GONE
+                binding.deleteButton.visibility = View.VISIBLE
 
                 val selectedId = DetailFragmentArgs.fromBundle(it).id
-                val database = requireActivity().openOrCreateDatabase("Arts", Context.MODE_PRIVATE,null)
+                mDisposable.add(artDao.getArtById(selectedId)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(this::handleResponseWithOldArt))
 
-                val cursor = database!!.rawQuery("SELECT * FROM arts WHERE id = ?", arrayOf(selectedId.toString()))
-
-                val artNameIx = cursor.getColumnIndex("artname")
-                val artistNameIx = cursor.getColumnIndex("artistname")
-                val yearIx = cursor.getColumnIndex("year")
-                val imageIx = cursor.getColumnIndex("image")
-
-                while (cursor.moveToNext()) {
-                    binding.artText.setText(cursor.getString(artNameIx))
-                    binding.artistText.setText(cursor.getString(artistNameIx))
-                    binding.yearText.setText(cursor.getString(yearIx))
-
-                    val byteArray = cursor.getBlob(imageIx)
-                    val bitmap = BitmapFactory.decodeByteArray(byteArray,0,byteArray.size)
-                    binding.imageView.setImageBitmap(bitmap)
-
-                }
-                cursor.close()
             }
         }
 
+    }
+
+    private fun handleResponseWithOldArt(art : Art) {
+        artFromMain = art
+        binding.artText.setText(art.artName)
+        binding.artistText.setText(art.artistName)
+        binding.yearText.setText(art.year)
+        art.image?.let {
+            val bitmap = BitmapFactory.decodeByteArray(it, 0, it.size)
+            binding.imageView.setImageBitmap(bitmap)
+        }
+    }
+
+    fun delete(view : View) {
+        artFromMain?.let {
+            mDisposable.add(artDao.delete(it)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::handleResponse))
+        }
     }
 
     fun save(view: View) {
@@ -119,31 +142,22 @@ class DetailFragment : Fragment() {
             smallBitmap.compress(Bitmap.CompressFormat.PNG,50,outputStream)
             val byteArray = outputStream.toByteArray()
 
-            try {
+            val art = Art(artName,artistName,year,byteArray)
 
-                val database = requireActivity().openOrCreateDatabase("Arts", Context.MODE_PRIVATE, null)
-                database?.execSQL("CREATE TABLE IF NOT EXISTS arts (id INTEGER PRIMARY KEY, artname VARCHAR, artistname VARCHAR, year VARCHAR, image BLOB)")
-
-                val sqlString =
-                    "INSERT INTO arts (artname, artistname, year, image) VALUES (?, ?, ?, ?)"
-                val statement = database!!.compileStatement(sqlString)
-                statement.bindString(1, artName)
-                statement.bindString(2, artistName)
-                statement.bindString(3, year)
-                statement.bindBlob(4, byteArray)
-
-                statement.execute()
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            val action = DetailFragmentDirections.actionDetailFragmentToArtList()
-            Navigation.findNavController(view).navigate(action)
-
+            mDisposable.add(artDao.insert(art)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::handleResponse))
 
         }
     }
+
+    private fun handleResponse() {
+        val action = DetailFragmentDirections.actionDetailFragmentToArtList()
+        Navigation.findNavController(requireView()).navigate(action)
+    }
+
+
 
     fun makeSmallerBitmap(image: Bitmap, maximumSize : Int) : Bitmap {
         var width = image.width

@@ -1,13 +1,14 @@
-package com.atilsamancioglu.artbooknavigation
+package com.atilsamancioglu.artbooknavigation.adapter
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.RecyclerView
+import com.atilsamancioglu.artbooknavigation.model.Art
 import com.atilsamancioglu.artbooknavigation.databinding.ItemRowBinding
+import com.atilsamancioglu.artbooknavigation.view.ArtListDirections
 
-class ArtListAdapter(val artNameList: ArrayList<String>, val artIdList: ArrayList<Int>) : RecyclerView.Adapter<ArtListAdapter.ArtHolder>() {
+class ArtListAdapter(val artList : List<Art>) : RecyclerView.Adapter<ArtListAdapter.ArtHolder>() {
 
     class ArtHolder(val binding : ItemRowBinding): RecyclerView.ViewHolder(binding.root) {
 
@@ -19,14 +20,14 @@ class ArtListAdapter(val artNameList: ArrayList<String>, val artIdList: ArrayLis
     }
 
     override fun getItemCount(): Int {
-        return artNameList.size
+        return artList.size
     }
 
     override fun onBindViewHolder(holder: ArtHolder, position: Int) {
 
-        holder.binding.artNameText.text = artNameList[position]
+        holder.binding.artNameText.text = artList[position].artName
         holder.itemView.setOnClickListener {
-            val action = ArtListDirections.actionArtListToDetailFragment(artIdList[position],"old")
+            val action = ArtListDirections.actionArtListToDetailFragment(artList[position].id,"old")
             Navigation.findNavController(it).navigate(action)
 
         }

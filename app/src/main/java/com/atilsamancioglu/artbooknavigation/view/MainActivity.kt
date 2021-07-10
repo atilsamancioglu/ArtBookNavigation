@@ -1,6 +1,5 @@
-package com.atilsamancioglu.artbooknavigation
+package com.atilsamancioglu.artbooknavigation.view
 
-import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
@@ -9,6 +8,7 @@ import androidx.navigation.NavController
 import androidx.navigation.Navigation
 import androidx.navigation.findNavController
 import androidx.navigation.ui.NavigationUI
+import com.atilsamancioglu.artbooknavigation.R
 
 class MainActivity : AppCompatActivity() {
 
@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        navigationController = Navigation.findNavController(this,R.id.fragment)
+        navigationController = Navigation.findNavController(this, R.id.fragment)
         NavigationUI.setupActionBarWithNavController(this,navigationController)
 
     }
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
 
         if (item.itemId == R.id.add_art_item) {
             val action = ArtListDirections.actionArtListToDetailFragment(0,"new")
-            Navigation.findNavController(this,R.id.fragment).navigate(action)
+            Navigation.findNavController(this, R.id.fragment).navigate(action)
 
         }
 
