@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
 
         if (item.itemId == R.id.add_art_item) {
-            val action = ArtListDirections.actionArtListToDetailFragment(0,"new")
+            val action = ArtListDirections.actionArtListToDetailFragment("new",0)
             Navigation.findNavController(this, R.id.fragment).navigate(action)
 
         }

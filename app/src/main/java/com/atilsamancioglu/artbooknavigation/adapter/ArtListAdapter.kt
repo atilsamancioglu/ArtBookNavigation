@@ -27,7 +27,7 @@ class ArtListAdapter(val artList : List<Art>) : RecyclerView.Adapter<ArtListAdap
 
         holder.binding.artNameText.text = artList[position].artName
         holder.itemView.setOnClickListener {
-            val action = ArtListDirections.actionArtListToDetailFragment(artList[position].id,"old")
+            val action = ArtListDirections.actionArtListToDetailFragment("old",id=artList[position].id)
             Navigation.findNavController(it).navigate(action)
 
         }
